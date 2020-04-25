@@ -20,7 +20,17 @@ double mistPeriod = 0.0;
 int mistLoop = 0;
 bool mistOn = false;
 
+int sampleSize = 50;
+float avgTemp[50];
+
+double targetTemp = 30.00;
+double currentTemp, pidOutput;
+PID heatingPID(&currentTemp, &pidOutput, &targetTemp, 0.5, 7, 1, DIRECT);
+
+int i = 0;
+
 void setup() {
+  heatingPID.SetMode(AUTOMATIC);
   Serial.begin(9600);
   pinMode(fan, OUTPUT);
   pinMode(mist, OUTPUT);
@@ -43,6 +53,22 @@ void makeMist() {
   }
 }
 
+double getTemp() {
+  double total = 0;
+  double rawvoltage= analogRead(temp);
+  double millivolts= (rawvoltage/1024.0) * 5000;
+  double celsius= millivolts/10;
+  for ( i=0; i<sampleSize-1; i++) {
+    avgTemp[i] = avgTemp[i+1];
+  }
+  avgTemp[sampleSize-1] = celsius;
+  for ( i=0; i<sampleSize; i++) {
+    total = total + avgTemp[i];
+  }
+  double average = total / sampleSize;
+  return average;
+}
+
 void loop() {
   mistTimer.run();
   if(!mistTimer.isCounterCompleted()) {
@@ -50,6 +76,9 @@ void loop() {
   }
 
   mistPeriod = analogRead(humidityDial) * 0.04;
+  currentTemp = getTemp(); 
+  heatingPID.Compute();
+  analogWrite(heater, pidOutput);
 
   if(mistOn) {
     digitalWrite(mist, HIGH);
@@ -58,4 +87,5 @@ void loop() {
     digitalWrite(mist, LOW);
     digitalWrite(fan, LOW);
   }
+
 }
